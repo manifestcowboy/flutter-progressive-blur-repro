@@ -43,7 +43,7 @@ class _HudOverlayState extends State<HudOverlay> {
   final Map<int, num> _baseline = <int, num>{};
   DateTime _resetAt = DateTime.now();
   Offset _drag = Offset.zero;
-  bool _compact = false;
+  bool _compact = true; // one line until tapped, so it does not cover the screen
 
   @override
   void initState() {
@@ -121,8 +121,9 @@ class _HudOverlayState extends State<HudOverlay> {
   Widget build(BuildContext context) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final FrameStatsSnapshot s = widget.collector.snapshot();
-    final double rssMb = ProcessInfo.currentRss / (1024 * 1024);
-    final double rssPeakMb = ProcessInfo.maxRss / (1024 * 1024);
+    // dart:io's ProcessInfo throws on web; report 0 there.
+    final double rssMb = kIsWeb ? 0 : ProcessInfo.currentRss / (1024 * 1024);
+    final double rssPeakMb = kIsWeb ? 0 : ProcessInfo.maxRss / (1024 * 1024);
 
     final TextStyle mono = TextStyle(
       fontFamily: 'monospace',
