@@ -33,9 +33,22 @@ On an iPhone 17 Pro (release) this killed the app with `Runner exceeded mem limi
 
 Flutter gives no signal for when a `toImageSync` image has actually been drawn and freed, so the package can't hold back. Our fix: the skip from case 2, a per-frame limit on snapshots, and a global cap on snapshots in flight. On the app side, the animation is now drawn with paint only instead of rebuilding widgets.
 
-## Still open: Android is laggy
+## Measured on Android with this demo (Nothing Phone (2))
 
-Even with every patch, the app still **feels laggy on Android** (Nothing Phone (2), Snapdragon 8+ Gen 1) on screens with the blur, while iPhone is smooth. A shader progressive blur still costs an offscreen snapshot plus a two-pass shader per blurred strip per frame. A native progressive blur in Flutter, such as a `BackdropFilter` or `ImageFilter` that takes a gradient mask for its strength, would avoid the snapshot entirely. That is the main thing we'd ask for. See [`FLUTTER_GAPS.md`](FLUTTER_GAPS.md).
+Snapdragon 8+ Gen 1 / Adreno 730, Android 16, 90 Hz screen. Profile build, Flutter 3.47.7, Impeller on Vulkan, "Real-app" load. fps is what Android actually put on screen. Graphics memory is the GPU row from `dumpsys meminfo`.
+
+| Screen | Default inspire_blur | Our band version |
+|---|---|---|
+| 1. Whole-list blur, scrolling | 88 to 94 fps (blur off: 92) | n/a |
+| 2. Header + footer blur, scrolling | **63 to 66 fps**, about 70% of frames late; **killed by Android for low memory** on the first run | 81 to 86 fps |
+| 2. Same, at rest (only the equalizer animates) | 63 fps | 81 fps |
+| 3. "Play 20 in a row" + flings | **42 to 48 fps**; graphics memory 64 to 161 MB in 42 s, still 185 MB 15 s after the end | 52 to 61 fps; 76 to 134 MB, 144 MB after |
+
+The same screen 2 with "Light" load ran at 84 fps on default inspire_blur, so the cost comes from what animates *under* the blur. On both versions graphics memory keeps growing and isn't given back after the animation stops.
+
+**Native crash.** A default inspire_blur run on screen 3, started with about 211 MB already in graphics memory, ended at 267 MB and crashed seconds later with a SIGSEGV (null pointer) inside the Adreno Vulkan driver's `vkDestroyFramebuffer`, called from the Flutter engine on the platform thread. The trimmed log is in [`reports/android-vkDestroyFramebuffer-crash.txt`](reports/android-vkDestroyFramebuffer-crash.txt).
+
+**So Android is still laggy, even with our patches** (52 to 86 fps on a 90 Hz screen), while iPhone is smooth in our app. A shader progressive blur still costs an offscreen snapshot plus a two-pass shader per blurred strip per frame. A native progressive blur in Flutter, such as a `BackdropFilter` or `ImageFilter` that takes a gradient mask for its strength, would avoid the snapshot entirely. That's the main thing we'd ask for. See [`FLUTTER_GAPS.md`](FLUTTER_GAPS.md).
 
 ## Running the demo
 

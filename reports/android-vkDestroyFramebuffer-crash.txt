@@ -1,0 +1,39 @@
+Native crash: Adreno Vulkan vkDestroyFramebuffer null deref under sustained toImageSync load
+
+Build: Flutter 3.47.7 (framework abaf9c5237), engine d8a2d6c768c334d53e16277f837970ffa1e2de81 (revision deb287481e), Dart 3.13.5.
+Profile APK, Impeller on Vulkan (default). libflutter.so BuildId e154c644713cf2bfb7a6ebb020fc0907fdaa340e.
+Device: Nothing Phone (2), model A065, Snapdragon 8+ Gen 1 / Adreno 730, Android 16.
+Build fingerprint: Nothing/Pong/Pong:16/BQ2A.250721.001-BP2A.250605.031.A3/2604141749:user/release-keys
+
+Repro: repro_app, screen 3 ("Long animation under the blur"), Load = Real-app, Blur = Inspire.childBlur
+(stock inspire_blur, toImageSync per frame), Animation = rebuild. "Play 20 in a row" with "Fling list"
+every ~6 s. The app had been running ~3.5 min; graphics memory had climbed to ~267 MB. Crash a few seconds
+after the run finished, app in foreground. A separate earlier run (screen 2) was killed for LOW_MEMORY in
+the foreground.
+
+Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x80 (main/platform thread: tid == pid)
+Cause: null pointer dereference
+ABI: 'arm64'
+backtrace:
+  #00 pc 000000000038bb1c  /vendor/lib64/hw/vulkan.adreno.so (BuildId: f8f0075fa2bcdb727471f21b3e8a990e)
+  #01 pc 0000000000162208  /vendor/lib64/hw/vulkan.adreno.so
+  #02 pc 00000000002eff58  /vendor/lib64/hw/vulkan.adreno.so
+  #03 pc 000000000022186c  /vendor/lib64/hw/vulkan.adreno.so
+  #04 pc 0000000000286020  /vendor/lib64/hw/vulkan.adreno.so (qglinternal::vkDestroyFramebuffer(VkDevice_T*, VkFramebuffer_T*, VkAllocationCallbacks const*)+72)
+  #05 pc 00000000004fe1d8  libflutter.so (BuildId: e154c644713cf2bfb7a6ebb020fc0907fdaa340e)
+  #06 pc 000000000089b51c  libflutter.so
+  #07 pc 00000000004fe1d8  libflutter.so
+  #08 pc 000000000089b6d4  libflutter.so
+  #09 pc 00000000004fe1d8  libflutter.so
+  #10 pc 00000000008e1008  libflutter.so
+  #11 pc 00000000008e1094  libflutter.so
+  #12 pc 0000000000539a40  libflutter.so
+  #13 pc 00000000005399dc  libflutter.so
+  #14 pc 00000000005398d8  libflutter.so
+  #15 pc 000000000053d7ec  libflutter.so
+  #16 pc 0000000000011f9c  /system/lib64/libutils.so (android::Looper::pollInner(int)+1248)
+  #17 pc 0000000000011a58  /system/lib64/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+136)
+  #18 pc 00000000001dd304  /system/lib64/libandroid_runtime.so (android::android_os_MessageQueue_nativePollOnce(_JNIEnv*, _jobject*, long, int)+48)
+  #19 pc 00000000023b34fc  /memfd:jit-cache (deleted)
+
+libflutter.so frames are unsymbolized; symbolize with the engine hash above.
