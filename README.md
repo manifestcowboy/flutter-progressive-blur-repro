@@ -21,7 +21,7 @@ Our patch adds a "band" mode (`Inspire.childBlurBand`, switch on demo screen 2) 
 
 **Demo screen 2:** the songs list with a blurred header and a blurred area above the mini player. The now-playing equalizer animates, and nothing else moves.
 
-Flutter only knows that *something* under a layer changed, not *where*. So a tiny animation far from the blurred strip still forces a new snapshot every frame. With a header blur and a footer blur nested, the stock package made 6 large snapshots per frame.
+Flutter only knows that *something* under a layer changed, not *where*. So a tiny animation far from the blurred strip still forces a new snapshot every frame. This is why a screen can feel heavy even when nothing seems to move: a small equalizer, a slowly drifting background or an image fading in is enough to keep the blur working at full cost. With a header blur and a footer blur nested, the stock package made 6 large snapshots per frame.
 
 Our patch hashes what's inside the blurred strip and skips the re-blur when it hasn't changed. It also reuses the snapshot within a frame (6 to 4 per frame).
 
