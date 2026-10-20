@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:inspire_blur/src/child_blur/inspire_child_blur_band_sampler.dart';
 import 'package:inspire_blur/src/inspire_backdrop_blur.dart';
 import 'package:inspire_blur/src/inspire_blur_config.dart';
 import 'package:inspire_blur/src/inspire_blur_mode.dart';
@@ -87,6 +88,37 @@ class Inspire {
       clipBehavior: clipBehavior,
       useRepaintBoundary: useRepaintBoundary,
       layoutInvalidationKey: layoutInvalidationKey,
+      child: child,
+    );
+  }
+
+  /// Patch 4 band sampler (see PATCHES.md), not in upstream.
+  ///
+  /// Same effect as [childBlur] under `InspireBlurMode.animatedSampler`, with
+  /// one composition change: everything OUTSIDE the mask's non-zero rows is
+  /// composited into the real scene directly instead of through a texture round
+  /// trip, and the snapshot the shader reads is clipped to the band plus the
+  /// kernel's reach. It falls back to [childBlur] whenever a guard is unmet.
+  ///
+  /// The band anchors to whichever edge the mask ramps FROM, read off the
+  /// gradient map rather than passed in — so this serves a top-anchored header
+  /// ramp and a bottom-anchored frosted footer alike, and a mask that blurs
+  /// both edges falls back. See `inspire_child_blur_band_sampler.dart` and
+  /// PATCHES.md.
+  static Widget childBlurBand({
+    required InspireBlurConfig config,
+    required Widget child,
+    Clip clipBehavior = Clip.antiAlias,
+    bool useRepaintBoundary = true,
+    Object? layoutInvalidationKey,
+    double realUnderlap = 0.0,
+  }) {
+    return InspireChildBlurBandSampler(
+      config: config,
+      clipBehavior: clipBehavior,
+      useRepaintBoundary: useRepaintBoundary,
+      layoutInvalidationKey: layoutInvalidationKey,
+      realUnderlap: realUnderlap,
       child: child,
     );
   }

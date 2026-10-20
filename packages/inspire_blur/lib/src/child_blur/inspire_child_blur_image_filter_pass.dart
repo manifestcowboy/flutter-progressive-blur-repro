@@ -5,7 +5,9 @@ import 'package:flutter/widgets.dart';
 import 'package:inspire_blur/src/color_adjustment/blur_color_adjustment.dart';
 import 'package:inspire_blur/src/inspire_shaders.dart';
 import 'package:inspire_blur/src/transform/blur_transform.dart';
-import 'package:inspire_blur/src/utils/extensions/inspire_double_extensions.dart';
+// Patch 1 imageFilter mask deltas (see PATCHES.md): `inspire_double_extensions.dart`
+// was imported here for takeNegativeOrZero/takePositiveOrZero, used only by the
+// screen-relative deltas this patch zeroes out (see paint()). Dropped with them.
 import 'package:inspire_blur/src/utils/extensions/inspire_geometry_extensions.dart';
 
 class InspireChildBlurImageFilterPass extends StatefulWidget {
@@ -136,8 +138,11 @@ class _BlurFiltered extends SingleChildRenderObjectWidget {
   Size _getScreenSize(ui.FlutterView view) =>
       view.physicalSize / view.devicePixelRatio;
 
+  // PATCHED vs upstream (PERF, Patch 7 MediaQuery aspects):
+  // `devicePixelRatioOf`, not `of(...)` - the keyboard must not rebuild this
+  // pass.
   double _getDpr(BuildContext context) =>
-      MediaQuery.of(context).devicePixelRatio;
+      MediaQuery.devicePixelRatioOf(context);
 }
 
 class _BlurFilterRenderObject extends RenderProxyBox {
@@ -317,19 +322,33 @@ class _BlurFilterRenderObject extends RenderProxyBox {
     if (_lastPaintedBounds?.isNotClose(newBounds) ?? true) {
       _lastPaintedBounds = newBounds;
 
-      final screenWidth = _screenSize.width;
-      final screenHeight = _screenSize.height;
-
-      final deltaLeft = newBounds.left.takeNegativeOrZero().abs();
-      final deltaTop = newBounds.top.takeNegativeOrZero().abs();
-      final deltaRight = (newBounds.right - screenWidth).takePositiveOrZero();
-      final deltaBottom =
-          (newBounds.bottom - screenHeight).takePositiveOrZero();
-
-      _shader.setFloat(5, deltaLeft * _dpr);
-      _shader.setFloat(6, deltaTop * _dpr);
-      _shader.setFloat(7, deltaRight * _dpr);
-      _shader.setFloat(8, deltaBottom * _dpr);
+      // ── Patch 1 imageFilter mask deltas · PATCHED vs upstream. ───────────
+      // Upstream wrote screen-relative deltas here:
+      //     deltaLeft   = bounds.left.takeNegativeOrZero().abs()
+      //     deltaTop    = bounds.top .takeNegativeOrZero().abs()
+      //     deltaRight  = (bounds.right  - _screenSize.width ).takePositiveOrZero()
+      //     deltaBottom = (bounds.bottom - _screenSize.height).takePositiveOrZero()
+      //     setFloat(5..8, delta * _dpr)
+      // — i.e. how far the child spills off each screen edge, in device px.
+      // The shader folds uniforms 5-8 straight into the gradient-map lookup
+      // (`shaders/inspire_blur_child.frag`):
+      //     uv_blur = (xy + u_delta_left_top)
+      //             / (u_size + u_delta_left_top + u_delta_right_bottom)
+      // i.e. they shift AND rescale the mask — they are the mask's denominator.
+      // The animatedSampler pass writes 0.0 into all four
+      // (`inspire_child_blur_animated_sampler_pass.dart`), unconditionally.
+      // So the two passes ramp over different denominators and CANNOT render
+      // the same blur, which is half of the imageFilter-vs-animatedSampler
+      // mismatch that was measured (the other half is the MAX_RADIUS unit
+      // mismatch, Patch 2, patched in the .frag).
+      // Zeroed to match the sampler exactly. The intended topology is a ramp
+      // that is the scroll view's PARENT and is on-screen by construction, so
+      // there these deltas were only ever a correction for a case that does
+      // not occur.
+      _shader.setFloat(5, 0.0);
+      _shader.setFloat(6, 0.0);
+      _shader.setFloat(7, 0.0);
+      _shader.setFloat(8, 0.0);
 
       _imageFilter = ui.ImageFilter.shader(_shader);
     }
@@ -340,7 +359,68 @@ class _BlurFilterRenderObject extends RenderProxyBox {
 
     context.pushLayer(filterLayer,
         (PaintingContext childContext, Offset childOffset) {
-      childContext.paintChild(childValue, childOffset);
+      // ── Patch 3 imageFilter coverage clip · PATCHED vs upstream. ─────────
+      // MEASURED (dpr-3 1:1 preview rig, debug shader that renders `uv.y` and
+      // the mask lookup instead of the blur):
+      //
+      //   surface                      u_size.y (dev px)  texture top vs screen row 0
+      //   list screen, at rest         2553.5             -1.4    → mask starts at 1.00
+      //   screen with scrolling sky    2738.3             -248.5  → mask starts at 0.37
+      //
+      // `ui.ImageFilter.shader` sets the shader's first vec2 (`u_size`) to
+      // "the size of the bound texture" (`dart:ui` painting.dart), and
+      // `FlutterFragCoord()` is relative to that texture's origin — NOT to
+      // this render object's box. The bound texture is the ImageFilterLayer's
+      // COVERAGE, i.e. whatever the child subtree actually painted. The shader
+      // divides by `u_size` and looks the gradient map up in that space
+      // (`inspire_blur_child.frag`: `uv_blur = xy / u_size`), so any subtree
+      // that paints outside the box stretches AND shifts the whole ramp.
+      //
+      // The second surface does exactly that, and the reason is ONE unclipped
+      // translate — not anything inside the background widget. The shell puts
+      // the sky INSIDE the ramp subtree and scrolls it with
+      //     Stack(fit: StackFit.expand, children: [
+      //       ValueListenableBuilder(... builder: (_, y, sky) =>
+      //           Transform.translate(offset: Offset(0, -y), child: sky)),
+      //       ...])
+      // The sky is a NON-POSITIONED stack child, so it is laid out at the
+      // viewport size and then painted `y` logical px ABOVE the box.
+      // `RenderStack.performLayout` sets `_hasVisualOverflow` only in the
+      // `childParentData.isPositioned` branch (`rendering/stack.dart`), so a
+      // non-positioned child that overflows never trips the stack's clip and
+      // nothing else on the path clips it either. The overhang is therefore
+      // exactly scroll-offset x dpr: 248.5 device px (82.8 pt) at the ~85 pt
+      // offset the capture was taken at — 45.4% of the ramp's whole length
+      // spent off-screen, and the visible band then ends ~71 pt early.
+      //
+      // That also explains every other measured fact: the overhang tracks the
+      // scroll offset (hence the scroll-state dependence), it stops growing at
+      // the bottom stop, and the list screen — same shell, same sky, but at
+      // rest — overhangs ~0 (-1.4 device px). The sky widget itself is NOT the
+      // culprit: the sky is wrapped in `IgnorePointer(ClipRect(...))`, and the
+      // parameter-driven variant — the only thing that owns the
+      // `ImageFiltered` glow circles at a negative `top` — is itself inside a
+      // `ClipRect`, so those circles cannot escape their own box, let alone
+      // the ramp's.
+      //
+      // `animatedSampler` is immune by construction: it sets `u_size` itself
+      // from the widget's own `size` and draws `Offset.zero & size`
+      // (`inspire_child_blur_animated_sampler_pass.dart`). Clipping the
+      // filtered child to that same box is what makes the two passes agree.
+      //
+      // Visually this clip is a no-op: `InspireChildBlur` already wraps the
+      // whole pass in a `ClipRect` of the same box (`inspire_child_blur.dart`
+      // `_wrapWithClipRect`), so the overhang was never visible — it only ever
+      // corrupted `u_size`.
+      childContext.pushClipRect(
+        true,
+        childOffset,
+        Offset.zero & size,
+        (PaintingContext clipContext, Offset clipOffset) {
+          clipContext.paintChild(childValue, clipOffset);
+        },
+        clipBehavior: Clip.hardEdge,
+      );
     }, offset);
   }
 }

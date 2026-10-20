@@ -207,6 +207,10 @@ class InspireChildBlur extends StatelessWidget {
           colorAdjustment: currentPassColorAdjustment,
           direction: direction,
           sigma: sigma,
+          // Patch 5 kernel sampling modes · the imageFilter arm above is not
+          // wired: its texel is already a DEVICE px, so the sparse-step
+          // defect the options address does not exist there.
+          sampling: config.sampling,
           child: child,
         )
     };

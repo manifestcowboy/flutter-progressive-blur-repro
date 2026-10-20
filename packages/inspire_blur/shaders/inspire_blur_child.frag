@@ -2,8 +2,36 @@
 #include <flutter/runtime_effect.glsl>
 
 // Maximum blur radius. Must be a compile-time constant to satisfy SkSL loop constraints.
-#define MAX_RADIUS 64
-#define MAX_RADIUS_F 64.0
+//
+// ── Patch 2 MAX_RADIUS · PATCHED vs upstream (was 64 / 64.0). ───────────────
+// `radius = ceil(3.0 * sigma)` below is TRUNCATED to this and then
+// renormalised, not clamped — so past the ceiling the Gaussian silently
+// degenerates into a box blur. There is no error and no banner; it just goes
+// boxy.
+//
+// The ceiling is in whatever units the sigma uniform arrived in, and the two
+// child-blur passes do NOT agree on those:
+//   · animatedSampler divides sigma by dpr before the shader
+//     (`inspire_child_blur_animated_sampler_pass.dart`), so the shader sees
+//     LOGICAL px and 64 meant a 64/3 = 21.33 logical-px ceiling.
+//   · imageFilter does not, so the shader sees DEVICE px and 64 meant a
+//     64/3 = 21.33 DEVICE-px ceiling — 7.11 logical on a 3x phone, i.e. HALF
+//     of a 44/3 = 14.667 logical sigma. At dpr 3 that is 44 device sigma
+//     wanting radius ceil(3*44) = 132 and getting 64.
+// That truncation is the boxy imageFilter blur that was measured; the other
+// half of that defect is the screen-relative deltas, patched in
+// `inspire_child_blur_image_filter_pass.dart` (Patch 1).
+//
+// 192 = ceil(3 * 64), which is the radius the DEVICE-px reading of the
+// package's own 64 ceiling implies. Sized to the maximum sigma a caller is
+// expected to use (64/3 logical = 64 device px at dpr 3), not to a particular
+// default — 132 would cover a 44 device px sigma and leave every sigma between
+// it and the ceiling truncated.
+//
+// Cost at rest is nil: the loop breaks on `x > radiusClamped`, so a sigma of
+// 44 still runs 44 iterations. This raises the compile-time bound only.
+#define MAX_RADIUS 192
+#define MAX_RADIUS_F 192.0
 
 // Minimum sigma below which blur is negligible and skipped.
 #define MIN_SIGMA 1.0e-2
@@ -45,6 +73,28 @@ uniform float u_saturation;
 uniform float u_vibrance;
 uniform float u_color_adjustment_blur_strength;
 uniform float u_color_adjustment_non_blur_strength;
+
+// ── Patch 5 kernel sampling modes · PATCHED vs upstream. ────────────────────
+// Observed: on a short list bounced past the bottom the header blur "looks
+// pixelated". The whole ramp then sits at a SMALL sigma (the caller scales it
+// by scroll progress), and the loop below steps one
+// TEXEL per tap. Under the two sampler passes a texel is one LOGICAL px — 3
+// device px at dpr 3 — so a sigma of ~1 logical averages a handful of copies
+// of the content shifted 3 device px apart: a stepped, ghosted image instead
+// of a soft one. These two floats pick an alternative; both default to 0.0,
+// and 0.0 runs the pub loop below byte for byte (the `< 0.5` branch).
+//
+//   u_sample_mode   0 unit       pub: one tap per texel (today)
+//                   1 fineStep   step = clamp(sigma / 3, deviceStep, 1) texel
+//                   2 denseTaps  one tap per DEVICE px while sigma < 12 dev px
+//                   3 minSigma   never below 9 device px; crossfade to bg
+//   u_device_step   one device px in texel units: 1/dpr for the sampler
+//                   passes (whose texel is logical), 1.0 for imageFilter.
+//
+// Floats 24 and 25. Unset uniforms are zero, so a caller that never sets them
+// gets today's kernel; every Dart caller in this package sets both anyway.
+uniform float u_sample_mode;
+uniform float u_device_step;
 
 vec2 transformUv(vec2 uv) {
   // Move to origin
@@ -157,6 +207,63 @@ vec4 applyColorAdjustments(vec4 color, float blurFactor) {
   return mix(original, color, adjustmentBlend);
 }
 
+// Patch 5 kernel sampling modes · modes 1-3 (see the uniforms). Same edge rule as pub's loop:
+// a tap outside [0, 1] is dropped and the rest renormalised. The reach never
+// exceeds pub's `ceil(3 * sigma)` texels in modes 1 and 2 (the window the band
+// sampler snapshots is sized to that); mode 3 reaches `ceil(3 * sigmaMin)`
+// and the band sampler widens its window to match.
+vec4 sampledBlur(vec2 uv, vec2 texelStep, float sigma, vec4 bg) {
+  float deviceStep = u_device_step > 0.0 ? min(u_device_step, 1.0) : 1.0;
+
+  float kernelSigma = sigma;
+  float fade = 1.0;
+  float stepTexels = 1.0;
+  if (u_sample_mode < 1.5) {
+    // 1 · fineStep: about three taps per sigma, never finer than a device px.
+    stepTexels = clamp(sigma / 3.0, deviceStep, 1.0);
+  } else if (u_sample_mode < 2.5) {
+    // 2 · denseTaps: every device px while the kernel is weak (< 12 device px).
+    stepTexels = sigma < 12.0 * deviceStep ? deviceStep : 1.0;
+  } else {
+    // 3 · minSigma: run the kernel at >= 9 device px (3 taps per sigma at the
+    // unit step, out of the sparse regime) and fade it in by sigma / sigmaMin.
+    float sigmaMin = 9.0 * deviceStep;
+    if (sigma < sigmaMin) {
+      fade = sigma / sigmaMin;
+      kernelSigma = sigmaMin;
+    }
+  }
+
+  float invTwoSigma2 = 1.0 / (2.0 * kernelSigma * kernelSigma);
+  float radiusClamped = min(ceil(3.0 * kernelSigma), MAX_RADIUS_F);
+  float taps = floor(radiusClamped / stepTexels + 1.0e-4);
+
+  vec4 totalColor = bg;
+  float totalWeight = 1.0;
+  for (int i = 1; i <= MAX_RADIUS; i++) {
+    float n = float(i);
+    if (n > taps) break;
+    float x = n * stepTexels;
+    float weight = exp(-(x * x) * invTwoSigma2);
+
+    vec2 uvRaw1 = uv + texelStep * x;
+    vec2 uvRaw2 = uv - texelStep * x;
+    float mask1 =
+        step(0.0, uvRaw1.x) * step(uvRaw1.x, 1.0) *
+        step(0.0, uvRaw1.y) * step(uvRaw1.y, 1.0);
+    float mask2 =
+        step(0.0, uvRaw2.x) * step(uvRaw2.x, 1.0) *
+        step(0.0, uvRaw2.y) * step(uvRaw2.y, 1.0);
+    vec4 c1 = texture(u_texture, clamp(uvRaw1, 0.0, 1.0));
+    vec4 c2 = texture(u_texture, clamp(uvRaw2, 0.0, 1.0));
+    float w1 = weight * mask1;
+    float w2 = weight * mask2;
+    totalColor += c1 * w1 + c2 * w2;
+    totalWeight += w1 + w2;
+  }
+  return mix(bg, totalColor / max(totalWeight, MIN_WEIGHT), fade);
+}
+
 void main() {
   vec2 xy = FlutterFragCoord().xy;
   vec2 uv = xy / u_size;
@@ -167,7 +274,7 @@ void main() {
 
 #if defined(IMPELLER_TARGET_OPENGLES) && !defined(IMPELLER_OPENGLES_UNFLIPPED_DEPRECATED)
     uv.y = 1.0 - uv.y;
-#endif
+  #endif
 
   vec4 bg = texture(u_texture, uv);
   float blurFactor = texture(u_blur_texture, uv_blur).r;
@@ -203,6 +310,9 @@ void main() {
   float totalWeight = 0.0;
   vec4 totalColor = vec4(0.0);
 
+  if (u_sample_mode >= 0.5) {
+    frag_color = sampledBlur(uv, texelStep, sigma, bg);
+  } else {
   for (int i = 0; i <= MAX_RADIUS; i++) {
     float x = float(i);
     if (x > radiusClamped) break;
@@ -243,6 +353,7 @@ void main() {
   }
 
   frag_color = totalColor / max(totalWeight, MIN_WEIGHT);
+  }
 
   if (
     u_color_adjustment_non_blur_strength > 0.0 ||
