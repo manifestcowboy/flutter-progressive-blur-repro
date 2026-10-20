@@ -1,0 +1,7 @@
+.dart_tool/
+build/
+.packages
+*.iml
+.idea/
+.DS_Store
+packages/inspire_blur/pubspec.lock

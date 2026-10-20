@@ -1,0 +1,28 @@
+name: inspire_blur_repro
+description: >-
+  A small music-player demo that reproduces, on a real phone, the performance
+  and crash problems met building a scroll-driven progressive blur with
+  inspire_blur, and shows the fixes side by side.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The package under test, by path. `git checkout upstream-0.4.1 --
+  # packages/inspire_blur` swaps it for pristine pub 0.4.1 (see README.md).
+  # flutter_shaders arrives transitively.
+  inspire_blur:
+    path: ../packages/inspire_blur
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
