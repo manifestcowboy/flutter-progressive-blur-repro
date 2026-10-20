@@ -1,6 +1,6 @@
 # Patches to inspire_blur 0.4.1
 
-Base: pub.dev `inspire_blur` 0.4.1, unmodified at tag `upstream-0.4.1`. See the full diff with `git diff upstream-0.4.1 -- packages/inspire_blur`. All numbers come from a 393x852 / 402x874 dpr-3 rig (macOS AOT and iOS Impeller) unless stated otherwise. The patches were first written against 0.4.0 and re-applied on 0.4.1. The only overlap was 0.4.1's OpenGL ES orientation guard in `inspire_blur_child.frag`, which is kept.
+Base: pub.dev `inspire_blur` 0.4.1, unmodified at branch `upstream-0.4.1`. See the full diff with `git diff origin/upstream-0.4.1 -- packages/inspire_blur`. All numbers come from a 393x852 / 402x874 dpr-3 rig (macOS AOT and iOS Impeller) unless stated otherwise. The patches were first written against 0.4.0 and re-applied on 0.4.1. The only overlap was 0.4.1's OpenGL ES orientation guard in `inspire_blur_child.frag`, which is kept.
 
 "Upstream?" is our view of whether a patch suits a PR to `inspirestack/inspire_blur` as it stands.
 

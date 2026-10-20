@@ -4,7 +4,7 @@ This repo collects what we learned shipping a **scroll-driven progressive blur**
 
 | Folder | What it is |
 |---|---|
-| [`packages/inspire_blur`](packages/inspire_blur) | `inspire_blur` 0.4.1 with our patches. The tag `upstream-0.4.1` is the untouched pub.dev release, so `git diff upstream-0.4.1 -- packages/inspire_blur` shows every change. |
+| [`packages/inspire_blur`](packages/inspire_blur) | `inspire_blur` 0.4.1 with our patches. The branch `upstream-0.4.1` is the untouched pub.dev release, so `git diff origin/upstream-0.4.1 -- packages/inspire_blur` shows every change. |
 | [`repro_app`](repro_app) | A small demo app with one screen per problem. Each screen recreates the problem with the stock package and shows the fix next to it. |
 | [`PATCHES.md`](PATCHES.md) | A technical write-up of each patch: the defect, the measurement, the fix, and whether it is a candidate for upstream. |
 | [`FLUTTER_GAPS.md`](FLUTTER_GAPS.md) | The things Flutter itself does not offer, which forced most of this work. |
@@ -106,7 +106,7 @@ Every problem below has a screen in `repro_app` (the **S-number**).
 
 ## How to reproduce
 
-See [`repro_app/README.md`](repro_app/README.md). In short: run on a **real device in profile mode**. Use `lib/main_stock.dart` against the untouched package (tag `upstream-0.4.1`) to see the original problems, and `lib/main.dart` for the patched version with on/off toggles. GPU memory doesn't show up in Dart, so watch it in Xcode's memory gauge or Instruments on iOS, or with `adb shell dumpsys meminfo` on Android.
+See [`repro_app/README.md`](repro_app/README.md). In short: run on a **real device in profile mode**. Use `lib/main_stock.dart` against the untouched package (branch `upstream-0.4.1`) to see the original problems, and `lib/main.dart` for the patched version with on/off toggles. GPU memory doesn't show up in Dart, so watch it in Xcode's memory gauge or Instruments on iOS, or with `adb shell dumpsys meminfo` on Android.
 
 ## License
 

@@ -28,11 +28,11 @@ flutter devices
 flutter run --profile -d <device-id> -t lib/main.dart
 ```
 
-To see the problems with the **unmodified** package, run the stock entrypoint against pristine `inspire_blur` 0.4.1 (tag `upstream-0.4.1`). Safest, without touching your working tree, is a second checkout:
+To see the problems with the **unmodified** package, run the stock entrypoint against pristine `inspire_blur` 0.4.1 (branch `upstream-0.4.1`). Safest, without touching your working tree, is a second checkout:
 
 ```sh
 # from the repo root
-git worktree add ../pristine upstream-0.4.1
+git worktree add ../pristine origin/upstream-0.4.1
 cp -r repro_app ../pristine/repro_app
 cd ../pristine/repro_app
 flutter pub get
@@ -43,7 +43,7 @@ Or switch the package in place (this **overwrites uncommitted changes** in `pack
 
 ```sh
 # from the repo root
-git checkout upstream-0.4.1 -- packages/inspire_blur
+git checkout origin/upstream-0.4.1 -- packages/inspire_blur
 git clean -fd packages/inspire_blur          # drops untracked patched-only files, if any
 cd repro_app && flutter run --profile -d <device-id> -t lib/main_stock.dart
 
@@ -150,6 +150,6 @@ test/
 
 - `flutter analyze`: no issues.
 - `flutter test`: 46 tests pass (home and every screen under both scenario lists, plus finger-level interactions on S2 to S9).
-- `lib/main_stock.dart` against a real pristine checkout: in a copy of the repo with `git checkout upstream-0.4.1 -- packages/inspire_blur`, `flutter analyze lib/main_stock.dart lib/stock lib/common lib/hud lib/app` is clean, `flutter test test/stock_smoke_test.dart test/stock_isolation_test.dart` passes, and `flutter build bundle --target=lib/main_stock.dart` succeeds.
+- `lib/main_stock.dart` against a real pristine checkout: in a copy of the repo with `git checkout origin/upstream-0.4.1 -- packages/inspire_blur`, `flutter analyze lib/main_stock.dart lib/stock lib/common lib/hud lib/app` is clean, `flutter test test/stock_smoke_test.dart test/stock_isolation_test.dart` passes, and `flutter build bundle --target=lib/main_stock.dart` succeeds.
 
 Not verified: running on a device. The widget tests do not load the blur shader or the distribution map (their async work does not complete under the test binding), so the blur render paths themselves, all timings, and all memory behaviour are unexercised until run on a phone. No Android or iOS build was made here.
