@@ -15,7 +15,7 @@ We ship a scroll-driven progressive blur in a production Flutter app (iOS and An
 
 `inspire_blur`'s child blur takes a full-size snapshot of everything under it (`toImageSync`) on every frame and redraws all of it through the shader. That includes the 80% of the list where the blur strength is zero. Flutter has no way to snapshot only part of a widget.
 
-Our patch adds a "band" mode that snapshots only the strip that is actually blurred. On iPhone: raster mean 2.40 to 1.23 ms, p95 8.80 to 4.05 ms, frames over budget 1.7% to 0%, which equals the cost with no blur at all. It also removed a faint shimmer on text below the blur, caused by the snapshot round trip changing antialiased edges.
+Our patch adds a "band" mode (`Inspire.childBlurBand`, switch on demo screen 2) that snapshots only the strip that is actually blurred. On iPhone: raster mean 2.40 to 1.23 ms, p95 8.80 to 4.05 ms, frames over budget 1.7% to 0%, which equals the cost with no blur at all. It also removed a faint shimmer on text below the blur, caused by the snapshot round trip changing antialiased edges.
 
 ## 2. Anything animating under the blur makes it re-blur every frame
 
