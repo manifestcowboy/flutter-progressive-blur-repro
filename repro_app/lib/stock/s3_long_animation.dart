@@ -18,36 +18,25 @@ const int _songCount = 80;
 
 ScenarioInfo _info(bool hasBand) => ScenarioInfo(
       finger:
-          '1. Swipe a song sideways (left or right, anywhere on the row): it '
-          'breaks into particles over 1.25 s, then the row collapses and the '
-          'song is removed. 2. Or press "Play once" (the third song) or '
-          '"Play 20 in a row" for a sustained run. 3. While it plays, press '
-          '"Fling list" (or fling by hand). 4. Compare "Animation: rebuild" '
-          'with "paint only"${hasBand ? ', and the stock blur with the band blur' : ''}. '
+          'Swipe a song sideways: it breaks into particles over 1.25 s, then '
+          'is removed. Or press "Play once" / "Play 20 in a row", and "Fling '
+          'list" while it plays. Compare Animation "rebuild" with "paint '
+          'only"${hasBand ? ', and the stock blur with the band blur' : ''}. '
           '"Restore songs" refills the list.',
       watch:
-          'A long animation sits under both blur layers (header and footer). '
-          'Every dirty frame makes two band-sized (or whole-child) textures '
-          'per layer, and the GPU only reclaims them when the raster thread '
-          'gets to them, so graphics memory climbs seconds ahead of '
-          'reclamation while Dart RSS stays flat. Use the Xcode memory gauge '
-          'or `adb shell dumpsys meminfo`, not the HUD RSS line.\n'
-          'The fix has three parts: (a) a window-signature gate in the band '
-          'sampler re-serves the band when nothing inside its window changed '
-          '(the dissolving row is outside both blur zones); (b) a paint-only '
-          'animation, so there is no rebuild or layout per frame; (c) a '
-          'global outstanding-texture cap as a backstop.'
-          '${hasBand ? '\nHUD counters (debug builds): band productions, window skips, forced refreshes, outstanding textures.' : ' (The band option only exists in main.dart.)'}',
-      saw: 'This is the case that crashed on iPhone: graphics memory went into '
-          'jetsam (ActiveHard 3376 MB). On the dev rig, a long animation '
-          'elsewhere under the band went from 1194 to 300 productions over '
-          '600 frames with the gate, and a paint-only animation brought it '
-          'to 0.50 productions per frame, equal to idle.',
+          'A long animation sits under both blur layers. Every dirty frame '
+          'makes new textures per layer and the GPU reclaims them late, so '
+          'graphics memory climbs while Dart RSS stays flat. Use the Xcode '
+          'memory gauge or `adb shell dumpsys meminfo`, not the HUD RSS.'
+          '${hasBand ? '\nIn debug builds the HUD counters show band productions and window skips.' : ''}',
+      saw: 'This crashed the app on iPhone (graphics memory, jetsam). On a '
+          'Nothing Phone (2) (Android) it still feels laggy even with the '
+          'band variant.',
       warning: 'On stock this can kill the app. Watch graphics memory, not '
           'RSS.',
     );
 
-/// S7: a playlist where removing a song plays a particle dissolve under the
+/// S3: a playlist where removing a song plays a particle dissolve under the
 /// blurs.
 class LongAnimationScreen extends StatefulWidget {
   const LongAnimationScreen({
@@ -129,7 +118,7 @@ class _LongAnimationScreenState extends State<LongAnimationScreen> {
   @override
   Widget build(BuildContext context) {
     return ScenarioScaffold(
-      title: 'S7 · Long animation under the blur',
+      title: 'S3 · Long animation under the blur',
       info: _info(widget.variants.length > 1),
       counters: <HudCounter>[
         HudCounter.count('songs removed', () => _removed),

@@ -42,7 +42,7 @@ class Particle {
 }
 
 /// A few hundred deterministic dots, the same in every run and both drive
-/// modes of S7.
+/// modes of S3.
 class ParticleField {
   ParticleField({int count = 320, int seed = 7})
       : particles = _generate(count, seed);

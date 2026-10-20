@@ -7,8 +7,7 @@ import '../common/blur_variant.dart';
 ///
 /// Every scenario here wraps a scroll view (the blur is the PARENT of the
 /// Scrollable), where `InspireBlurMode.auto` would pick the image-filter
-/// renderer on a phone. Pinning keeps the renderer fixed, except in S3 which
-/// is about exactly that choice.
+/// renderer on a phone. Pinning keeps the renderer fixed.
 final BlurVariant stockChildBlur = BlurVariant(
   'Inspire.childBlur',
   (InspireBlurConfig config, Widget child) => Inspire.childBlur(

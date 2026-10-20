@@ -164,9 +164,6 @@ class _ScenarioScaffoldState extends State<ScenarioScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // A keyboard must not resize the body: S8 isolates what the blur does
-      // on the keyboard's MediaQuery changes, not on a relayout.
-      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
         toolbarHeight: 48,
