@@ -60,7 +60,7 @@ Useful flags: `--no-enable-impeller` (Skia: `ImageFilter.isShaderFilterSupported
 Every screen is an ordinary-looking music screen with a **test panel** above it:
 
 - the **info card** (collapsible, stays collapsed across screens): *With your finger*, *Watch*, *What we saw on device (reported)*;
-- the **controls** (A/B toggles, sliders, buttons);
+- the **controls** (**Load**, A/B toggles, sliders, buttons);
 - the **HUD** floating over the screen. Tap its title to collapse it to one line, drag it out of the way, **Reset stats** to start a fresh window.
 
 HUD fields:
@@ -72,6 +72,19 @@ HUD fields:
 - On `main.dart`, the patched package's production and texture counters. **They only move in debug builds**: the package increments them behind `if (kDebugMode)`. In `--profile` the HUD prints "n/a (debug build only)". To read them, run the scenario once with `flutter run --debug` (numbers only; take timings from `--profile`).
 
 The HUD itself causes about two trivial frames per second, which are in the stats like any other. Use **Auto-scroll** (where offered) for repeatable runs; touching the list while it runs fights it, so switch it off first.
+
+## Load
+
+Every screen's controls start with **Load** (Light / Real-app, default **Real-app**), one global setting shared by all three screens.
+
+- **Light**: the bare demo, rows on a flat surface. On a Nothing Phone (2) in profile mode this alone reproduced nothing (reported: S1 raster p95 about 2 ms, S2 stock and band both under 9 ms, S3 memory flat).
+- **Real-app**: what the production screens put under their blurs, all **inside the blurred child**:
+  - `AmbientBackground`: large soft colour blobs (six full-area `RadialGradient` fills) drifting forever, repainted every frame by a `CustomPainter`, so the blurred subtree is dirty every frame, even at rest;
+  - glass cards (`BackdropFilter`, sigma 20, in a rounded `ClipRRect`): a "Recently played" row at the top and one after every 5th song;
+  - large cover tiles: 2-column "Made for you" grids after every 5th song (same `CoverArt`, only bigger);
+  - long lists: 400 items in S1 and S2, 160 songs plus the cards in S3.
+
+Both loads keep sigma 14.667 logical px (44 device px at 3x), the 120 pt header zone and, on S2 and S3, the footer zone above the mini player; S1 stays header-only. Code: `common/load.dart`, `ambient_background.dart`, `real_app_content.dart` (stock-API only). Refresh rate: `CADisableMinimumFrameDurationOnPhone` is set in `ios/Runner/Info.plist` so ProMotion iPhones can run 120 Hz; Android is left at its default.
 
 ## Watching GPU memory
 
@@ -115,7 +128,7 @@ Blur sigma note: `inspire_blur` takes sigma in **device** px (the animated-sampl
 |---|---|---|---|---|
 | **S1** Whole-child blur | Library > Songs | stock | 1. With the list at the top, drag it up slowly: the app bar blur ramps in over the first 80 pt. 2. Keep scrolling 5 s (or Auto-scroll). 3. Switch Blur off and repeat. | Raster time on vs off: the **whole list** is re-rasterised every frame, even below the zone where the mask is zero. Zone ruler marks 120 pt. On a Nothing Phone (2) (Android) it still feels laggy. |
 | **S2** Header + footer blur nested | Library > Songs with mini player and navigation bar | stock + band A/B | 1. Leave the list at rest for a few seconds and read the HUD. 2. Scroll slowly up and down (or Auto-scroll). 3. Switch "Animated" off and on (equalizer on the playing song, progress bar and equalizer on the mini player). 4. `main.dart`: switch Blur to `Inspire.childBlurBand` and repeat. | The footer blur **wraps** the header blur which wraps the list; the playing song's equalizer repaints every frame inside, so the subtree is dirty even at rest. Stock: each layer re-snapshots its whole child per ancestor walk, 6 render targets per frame. Band: counters (debug) show productions, window skips, same-frame reuse. On a Nothing Phone (2) (Android) it still feels laggy with the band variant. |
-| **S3** Long animation under the blur | Playlist (swipe a song to remove it) | stock + band A/B | 1. Swipe a song sideways: it breaks into particles over 1.25 s, then collapses. 2. Or press "Play once" (third song), or "Play 20 in a row". 3. While it plays press "Fling list" (or fling by hand). 4. Compare Animation "rebuild" with "paint only", and (`main.dart`) Blur stock with band. "Restore songs" refills the list. | **Can crash the app** on stock (iPhone: graphics memory into jetsam). Each dirty frame makes band-sized textures per blur layer and reclamation lags seconds behind. The fix: (a) window-signature gate in the band sampler re-serves the band when nothing in its window changed, (b) paint-only animation, (c) global outstanding-texture cap as backstop. Watch graphics memory; HUD counters (debug) show productions and window skips. On a Nothing Phone (2) (Android) it still feels laggy with the band variant. |
+| **S3** Long animation under the blur | Playlist (swipe a song to remove it) | stock + band A/B | 1. Swipe a song sideways: it breaks into particles over 1.25 s, then collapses. 2. Or press "Play once" (the third song from the top of what is on screen), or "Play 20 in a row". 3. While it plays press "Fling list" (or fling by hand); the run carries on at wherever the list is. 4. Compare Animation "rebuild" with "paint only", and (`main.dart`) Blur stock with band. "Restore songs" refills the list. | **Can crash the app** on stock (iPhone: graphics memory into jetsam). Each dirty frame makes band-sized textures per blur layer and reclamation lags seconds behind. The fix: (a) window-signature gate in the band sampler re-serves the band when nothing in its window changed, (b) paint-only animation, (c) global outstanding-texture cap as backstop. Watch graphics memory; HUD counters (debug) show productions and window skips. On a Nothing Phone (2) (Android) it still feels laggy with the band variant. |
 
 Each info card in the app carries the same steps plus "what we saw on device". Those "saw" lines are the app team's reported observations (and the dev-rig numbers from `PATCHES.md`); this demo does not measure or reproduce those figures by itself.
 
@@ -128,14 +141,16 @@ lib/
   app/                 MaterialApp shell, home menu, Scenario model
   hud/                 FrameTiming collector, HUD overlay, HudCounter
   common/              music content widgets, test-panel scaffold, controls,
-                       particles, nested blur body (stock-API only)
+                       particles, nested blur body, Load setting, ambient
+                       background, glass cards and cover grids (stock-API only)
   stock/               S1-S3 screens + buildStockScenarios()
   patched/             Inspire.childBlurBand variant, debug counters
                        + buildAllScenarios()
 test/
-  smoke_test.dart          home + every screen under both scenario lists
+  smoke_test.dart          home + every screen (both loads) under both scenario lists
   stock_smoke_test.dart    same for the stock list only (runs on pristine too)
   stock_isolation_test.dart  main_stock.dart never reaches lib/patched
+  real_app_slots_test.dart   slot pattern of the Real-app lists
 ```
 
 `hud/`, `common/`, `stock/` and `app/` must keep compiling against pristine 0.4.1; anything that needs the patched package goes under `lib/patched/`.
@@ -143,7 +158,9 @@ test/
 ## What was verified
 
 - `flutter analyze`: no issues.
-- `flutter test`: 21 tests pass (home and every screen under both scenario lists, plus finger-level interactions).
-- `lib/main_stock.dart` against a real pristine checkout: in a copy of the repo with `git checkout origin/upstream-0.4.1 -- packages/inspire_blur`, `flutter analyze lib/main_stock.dart lib/stock lib/common lib/hud lib/app` is clean, `flutter test test/stock_smoke_test.dart test/stock_isolation_test.dart` passes, and `flutter build bundle --target=lib/main_stock.dart` succeeds.
+- `flutter test`: 42 tests pass (home and every screen, under both loads and both scenario lists, plus finger-level interactions, among them "Play 20 in a row" with "Fling list" under both loads).
+- `lib/main_stock.dart` against a real pristine package: in a copy of the tree with `packages/inspire_blur` replaced by `git archive upstream-0.4.1`, `flutter analyze lib/main_stock.dart lib/stock lib/common lib/hud lib/app` and the stock tests are clean, `flutter test test/stock_smoke_test.dart test/stock_isolation_test.dart test/real_app_slots_test.dart` passes (18 tests), and `flutter build bundle --target=lib/main_stock.dart` succeeds.
 
-Not verified: running on a device. The widget tests do not load the blur shader or the distribution map (their async work does not complete under the test binding), so the blur render paths themselves, all timings, and all memory behaviour are unexercised until run on a phone. No Android or iOS build was made here.
+Fixed: in S3, "Fling list" while "Play 20 in a row" was running froze the run after a couple of songs and it never finished. The list builds rows lazily, so the flung list disposed the row that was mid-dissolve, and a disposed `AnimationController` leaves its `forward()` future unresolved; the run awaited it forever. A dissolving row now keeps itself alive until it has been removed (and never leaves a waiter hanging if it is disposed anyway), and the run targets the third song of what is on screen instead of a fixed list index that scrolling had made unbuilt. `test/support/smoke_cases.dart` covers it.
+
+Not verified: running on a device, and that Real-app is heavy enough to show the production cost (it was built to the brief, not measured). The widget tests do not load the blur shader or the distribution map (their async work does not complete under the test binding), so the blur render paths themselves, all timings, and all memory behaviour are unexercised until run on a phone. No Android or iOS build was made here.

@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'constants.dart';
 import 'music_data.dart';
 
 /// Generated cover art: a two-colour gradient with a ring and a stripe, so it
@@ -213,45 +212,6 @@ class AlbumRow extends StatelessWidget {
             ),
           ),
         );
-      },
-    );
-  }
-}
-
-/// The default songs list used by the blur scenarios: songs, with a row of
-/// albums every sixth item.
-///
-/// [overrides] replaces individual rows (the animated ones in S2 and S3).
-class SongsListView extends StatelessWidget {
-  const SongsListView({
-    super.key,
-    required this.controller,
-    this.topPadding = kHeaderHeight,
-    this.bottomPadding = 24,
-    this.itemCount = 400,
-    this.overrides = const <int, WidgetBuilder>{},
-    this.physics,
-  });
-
-  final ScrollController controller;
-  final double topPadding;
-  final double bottomPadding;
-  final int itemCount;
-  final Map<int, WidgetBuilder> overrides;
-  final ScrollPhysics? physics;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      controller: controller,
-      physics: physics,
-      padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
-      itemCount: itemCount,
-      itemBuilder: (BuildContext context, int i) {
-        final WidgetBuilder? custom = overrides[i];
-        if (custom != null) return custom(context);
-        if (i % 6 == 5) return AlbumRow(index: i);
-        return SongTile(song: songAt(i));
       },
     );
   }

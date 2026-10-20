@@ -4,15 +4,17 @@ import '../common/auto_scroller.dart';
 import '../common/blur_variant.dart';
 import '../common/constants.dart';
 import '../common/controls.dart';
+import '../common/load.dart';
 import '../common/music_chrome.dart';
 import '../common/music_data.dart';
-import '../common/music_widgets.dart';
 import '../common/nested_blur_body.dart';
 import '../common/scenario_scaffold.dart';
+import '../common/songs_list.dart';
 import '../hud/hud_counter.dart';
 
 /// Where the playing song sits in the list: below both blur zones at rest.
-const int _playingIndex = 2;
+/// Under Load "Real-app" the "Recently played" row takes the first slot.
+int _playingIndexFor(AppLoad load) => load == AppLoad.realApp ? 1 : 2;
 
 ScenarioInfo _info(bool hasBand) => ScenarioInfo(
       finger:
@@ -24,7 +26,9 @@ ScenarioInfo _info(bool hasBand) => ScenarioInfo(
           'The footer blur wraps the header blur, which wraps the list. The '
           'playing song repaints every frame inside, so the blurred subtree '
           'is dirty even at rest. Compare raster time and graphics memory '
-          '(not RSS) with Animated on vs off.'
+          '(not RSS) with Animated on vs off. Load "Real-app" (default) adds an '
+          'ambient background that repaints every frame, glass cards and large '
+          'covers inside the blurred child.'
           '${hasBand ? '\nIn debug builds the HUD counters show band productions and outstanding textures.' : ''}',
       saw: 'With stock Inspire.childBlur every nested layer re-rasterised its '
           'whole child: 6 render targets per frame. On a Nothing Phone (2) '
@@ -70,6 +74,7 @@ class _NestedBlurScreenState extends State<NestedBlurScreen> {
       counters: widget.counters,
       controls: ControlsRow(
         children: <Widget>[
+          const LoadChoice(),
           if (widget.variants.length > 1)
             SegmentChoice<int>(
               label: 'Blur',
@@ -102,14 +107,24 @@ class _NestedBlurScreenState extends State<NestedBlurScreen> {
         nowPlayingAnimated: _animated,
         body: NestedBlurBody(
           variant: widget.variants[_variant],
-          list: SongsListView(
-            key: _listKey,
-            controller: _scroll,
-            bottomPadding: kBottomBarsHeight + 16,
-            overrides: <int, WidgetBuilder>{
-              _playingIndex: (_) =>
-                  PlayingSongTile(song: songAt(_playingIndex), animate: _animated),
-            },
+          list: LoadStage(
+            child: ValueListenableBuilder<AppLoad>(
+              valueListenable: appLoad,
+              builder: (BuildContext context, AppLoad load, Widget? _) {
+                final int playing = _playingIndexFor(load);
+                return SongsListView(
+                  key: _listKey,
+                  controller: _scroll,
+                  bottomPadding: kBottomBarsHeight + 16,
+                  overrides: <int, WidgetBuilder>{
+                    playing: (_) => PlayingSongTile(
+                      song: songAt(playing),
+                      animate: _animated,
+                    ),
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),

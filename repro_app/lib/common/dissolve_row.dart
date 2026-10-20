@@ -23,6 +23,9 @@ final ParticleField _sharedField = ParticleField();
 /// sideways, then collapses and calls [onRemoved].
 ///
 /// Keep a `GlobalKey<DissolveSongRowState>` to start it from code.
+///
+/// While it dissolves the row keeps itself alive in its list, so it also
+/// finishes (and removes itself) when the list is scrolled away from it.
 class DissolveSongRow extends StatefulWidget {
   const DissolveSongRow({
     super.key,
@@ -40,7 +43,7 @@ class DissolveSongRow extends StatefulWidget {
 }
 
 class DissolveSongRowState extends State<DissolveSongRow>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late final AnimationController _dissolve = AnimationController(
     vsync: this,
     duration: ParticleField.duration,
@@ -61,34 +64,53 @@ class DissolveSongRowState extends State<DissolveSongRow>
   Completer<void>? _running;
   double _swipe = 0;
 
+  /// A list builds only the rows near the viewport and disposes the others.
+  /// A row that is mid-dissolve must outlive that: its controllers would be
+  /// disposed under a pending `forward()`, which then never completes (a
+  /// disposed ticker cancels the animation without resolving its future).
+  @override
+  bool get wantKeepAlive => _running != null;
+
   @override
   void dispose() {
     _dissolve.dispose();
     _collapse.dispose();
+    // Whoever awaits `startDissolve` must not hang if the row is torn down
+    // mid-run (e.g. "Restore songs" replaces it).
+    final Completer<void>? running = _running;
+    if (running != null && !running.isCompleted) running.complete();
     super.dispose();
   }
 
   /// Plays the dissolve, collapses the row, calls `onRemoved`. Completes when
-  /// that is done; calling it again while it runs returns the same future.
+  /// that is done (or the row is disposed first); calling it again while it
+  /// runs returns the same future.
   Future<void> startDissolve() {
     final Completer<void>? running = _running;
     if (running != null) return running.future;
     final Completer<void> done = _running = Completer<void>();
+    updateKeepAlive();
     unawaited(_play(done));
     return done.future;
   }
 
   Future<void> _play(Completer<void> done) async {
-    await _dissolve.forward(from: 0);
-    if (!mounted) return;
-    await _collapse.reverse();
-    if (!mounted) return;
-    widget.onRemoved();
-    done.complete();
+    try {
+      await _dissolve.forward(from: 0).orCancel;
+      if (!mounted) return;
+      await _collapse.reverse().orCancel;
+      if (!mounted) return;
+      widget.onRemoved();
+    } on TickerCanceled {
+      // Disposed mid-run; nothing left to remove.
+    } finally {
+      if (!done.isCompleted) done.complete();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin
     final Widget row = SongTile(song: widget.song);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

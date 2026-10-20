@@ -5,9 +5,10 @@ import '../common/auto_scroller.dart';
 import '../common/blur_util.dart';
 import '../common/constants.dart';
 import '../common/controls.dart';
+import '../common/load.dart';
 import '../common/music_chrome.dart';
-import '../common/music_widgets.dart';
 import '../common/scenario_scaffold.dart';
+import '../common/songs_list.dart';
 import '../common/zone_ruler.dart';
 
 const ScenarioInfo _info = ScenarioInfo(
@@ -18,7 +19,9 @@ const ScenarioInfo _info = ScenarioInfo(
   watch:
       'HUD raster time with Blur on vs off. Inspire.childBlur snapshots the '
       'whole list and runs the shader over all of it every frame, even below '
-      'the 120 pt zone where the mask is zero.',
+      'the 120 pt zone where the mask is zero. Load "Real-app" (default) puts '
+      'an ambient background that repaints every frame, glass cards and large '
+      'covers inside the blurred child; "Light" is the bare list.',
   saw: 'On a Nothing Phone (2) (Android, Impeller) this still felt laggy; '
       'an iPhone was smooth.',
 );
@@ -36,9 +39,11 @@ class _WholeChildBlurScreenState extends State<WholeChildBlurScreen> {
   late final AutoScroller _auto = AutoScroller(_scroll);
   final ValueNotifier<double> _offset = ValueNotifier<double>(0);
 
-  /// Keeps the list's State alive when the blur wrapper above it appears,
-  /// disappears or switches between sigma 0 (bare child) and sigma > 0.
+  /// Keep the list's State (and the ambient background's) alive when the blur
+  /// wrapper above them appears, disappears or switches between sigma 0 (bare
+  /// child) and sigma > 0.
   final GlobalKey _listKey = GlobalKey();
+  final GlobalKey _stageKey = GlobalKey();
 
   bool _blurOn = true;
   bool _ruler = false;
@@ -61,12 +66,18 @@ class _WholeChildBlurScreenState extends State<WholeChildBlurScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Widget list = SongsListView(key: _listKey, controller: _scroll);
+    // What goes inside the blur: the scroll view, plus under Load "Real-app"
+    // the animated ambient background behind it.
+    final Widget list = LoadStage(
+      key: _stageKey,
+      child: SongsListView(key: _listKey, controller: _scroll),
+    );
     return ScenarioScaffold(
       title: 'S1 · Whole-child blur',
       info: _info,
       controls: ControlsRow(
         children: <Widget>[
+          const LoadChoice(),
           ToggleChip(
             label: 'Blur on',
             value: _blurOn,
