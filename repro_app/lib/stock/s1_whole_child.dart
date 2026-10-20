@@ -12,29 +12,18 @@ import '../common/zone_ruler.dart';
 
 const ScenarioInfo _info = ScenarioInfo(
   finger:
-      'Start with the list at the top and drag it up slowly. The app bar blur '
-      'ramps in from 0 over the first 80 pt of scroll and then holds. Keep '
-      'scrolling for a few seconds (or use Auto-scroll), then switch Blur off '
-      'and scroll the same way to compare.',
+      'Drag the list up slowly from the top: the app bar blur ramps in over '
+      'the first 80 pt. Keep scrolling for a few seconds (or use '
+      'Auto-scroll), then switch Blur off and scroll the same way.',
   watch:
-      '1. Cost: HUD raster time with Blur on vs off. Inspire.childBlur '
-      '(animatedSampler) snapshots the WHOLE list into a texture and runs the '
-      'shader over all of it every frame, even below the 120 pt zone where '
-      'the mask is zero.\n'
-      '2. Shimmer: with blur on, antialiased edges below the zone (cover art '
-      'rims, glyph edges) shimmer slightly while the list moves, compared '
-      'with blur off, because every pixel takes a texture round trip.\n'
-      '3. Sigma units: inspire_blur takes sigma in DEVICE px. This screen '
-      'passes 14.667 * devicePixelRatio (44 at 3x), which is the same blur as '
-      '14.667 logical px with ImageFilter.blur.',
-  saw: 'The whole list is re-rasterised every frame even where the mask is '
-      'zero, and antialiased edges below the blur zone shimmer slightly '
-      'compared with blur off. On a Nothing Phone (2) (Adreno 730, Impeller) a '
-      'snapshot plus a two-pass Gaussian per frame still felt laggy; an '
-      'iPhone was smooth.',
+      'HUD raster time with Blur on vs off. Inspire.childBlur snapshots the '
+      'whole list and runs the shader over all of it every frame, even below '
+      'the 120 pt zone where the mask is zero.',
+  saw: 'On a Nothing Phone (2) (Android, Impeller) this still felt laggy; '
+      'an iPhone was smooth.',
 );
 
-/// S2: `Inspire.childBlur` over a scroll view, sigma driven by scroll offset.
+/// S1: `Inspire.childBlur` over a scroll view, sigma driven by scroll offset.
 class WholeChildBlurScreen extends StatefulWidget {
   const WholeChildBlurScreen({super.key});
 
@@ -74,7 +63,7 @@ class _WholeChildBlurScreenState extends State<WholeChildBlurScreen> {
   Widget build(BuildContext context) {
     final Widget list = SongsListView(key: _listKey, controller: _scroll);
     return ScenarioScaffold(
-      title: 'S2 · Whole-child blur (stock)',
+      title: 'S1 · Whole-child blur',
       info: _info,
       controls: ControlsRow(
         children: <Widget>[

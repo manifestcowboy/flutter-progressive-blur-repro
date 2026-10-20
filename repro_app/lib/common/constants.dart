@@ -1,13 +1,13 @@
 /// Height of the blurred zone under the top bar, in logical px.
 const double kZoneHeight = 120;
 
-/// Height of the blurred zone above the bottom bars (S6, S7), in logical px.
+/// Height of the blurred zone above the bottom bars (S2, S3), in logical px.
 const double kFooterZoneHeight = 168;
 
 /// The sigma the app under test uses, in LOGICAL px: 44 device px at 3x.
 ///
 /// inspire_blur takes sigma in DEVICE px (see `deviceSigma`), whereas
-/// `ImageFilter.blur` (S1) takes logical px.
+/// `ImageFilter.blur` takes logical px.
 const double kBlurLogicalSigma = 44 / 3;
 
 /// Scroll distance over which a scroll-driven blur ramps from 0 to full sigma.

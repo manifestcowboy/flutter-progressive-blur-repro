@@ -66,7 +66,7 @@ class FrameStatsSnapshot {
   final PhaseStats raster;
 
   /// Slowest UI-thread frame that finished rasterising within the last second.
-  /// A one-frame stall (S4) is visible here for a second, then scrolls out.
+  /// A one-frame stall is visible here for a second, then scrolls out.
   final double worstUiLastSecondMs;
 
   /// Slowest UI-thread frame since the last reset.

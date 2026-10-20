@@ -6,10 +6,7 @@ enum ScenarioKind {
   stock('STOCK'),
 
   /// A stock scenario that also offers the band sampler as an A/B toggle.
-  stockWithBand('STOCK + BAND A/B'),
-
-  /// Needs the patched package.
-  patchedOnly('PATCHED');
+  stockWithBand('STOCK + BAND A/B');
 
   const ScenarioKind(this.badge);
 
@@ -27,7 +24,7 @@ class Scenario {
     required this.builder,
   });
 
-  /// `S1` .. `S9`.
+  /// `S1` .. `S3`.
   final String id;
   final String title;
 

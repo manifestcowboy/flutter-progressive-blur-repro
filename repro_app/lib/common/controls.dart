@@ -91,53 +91,6 @@ class SegmentChoice<T> extends StatelessWidget {
   }
 }
 
-/// A labelled slider with its current value printed at the end.
-class LabeledSlider extends StatelessWidget {
-  const LabeledSlider({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.onChanged,
-    this.divisions,
-    this.unit = '',
-  });
-
-  final String label;
-  final double value;
-  final double min;
-  final double max;
-  final int? divisions;
-  final String unit;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 320,
-      child: Row(
-        children: <Widget>[
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
-          Expanded(
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              divisions: divisions,
-              onChanged: onChanged,
-            ),
-          ),
-          Text(
-            '${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1)}$unit',
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// A small tonal button for one-shot actions.
 class ActionButton extends StatelessWidget {
   const ActionButton({super.key, required this.label, required this.onPressed});

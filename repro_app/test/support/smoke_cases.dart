@@ -77,8 +77,8 @@ void defineSmokeTests(String name, List<Scenario> Function() scenarios) {
 /// Finger-level behaviour of the scenarios that exist in pristine 0.4.1.
 void defineStockInteractionTests() {
   group('stock interactions', () {
-    testWidgets('S2 scrolls and toggles the blur', (WidgetTester tester) async {
-      await mount(tester, scenarioById(buildStockScenarios(), 'S2'));
+    testWidgets('S1 scrolls and toggles the blur', (WidgetTester tester) async {
+      await mount(tester, scenarioById(buildStockScenarios(), 'S1'));
       await scrollList(tester, -300);
       await pumpFrames(tester);
       await tester.tap(find.text('Blur on'));
@@ -88,67 +88,10 @@ void defineStockInteractionTests() {
       await unmount(tester);
     });
 
-    testWidgets('S3 switches mode, sigma and overhang', (
+    testWidgets('S3 dissolves a row, then removes it', (
       WidgetTester tester,
     ) async {
       await mount(tester, scenarioById(buildStockScenarios(), 'S3'));
-      for (final String label in <String>['animatedSampler', 'imageFilter', 'auto']) {
-        await tester.tap(find.text(label));
-        await pumpFrames(tester, frames: 3);
-      }
-      await tester.tap(find.text('Child paints 250 px above'));
-      await pumpFrames(tester, frames: 3);
-      await tester.drag(find.byType(Slider), const Offset(120, 0));
-      await pumpFrames(tester, frames: 3);
-      await unmount(tester);
-    });
-
-    testWidgets('S4 mounts and unmounts the naive blur', (
-      WidgetTester tester,
-    ) async {
-      await mount(tester, scenarioById(buildStockScenarios(), 'S4'));
-      final TestGesture touch = await tester.startGesture(
-        tester.getCenter(find.byType(ListView).last),
-      );
-      await pumpFrames(tester, frames: 2);
-      await touch.moveBy(const Offset(0, -200));
-      await pumpFrames(tester, frames: 2);
-      await touch.up();
-      await pumpFrames(tester);
-      for (final String label in <String>['mounted', 'fixed', 'naive']) {
-        await tester.tap(find.text(label));
-        await pumpFrames(tester, frames: 3);
-      }
-      await unmount(tester);
-    });
-
-    testWidgets('S5 drags a row in every config mode', (
-      WidgetTester tester,
-    ) async {
-      await mount(tester, scenarioById(buildStockScenarios(), 'S5'));
-      for (final String label in <String>[
-        'new directional',
-        'memoized',
-        'new mask image',
-      ]) {
-        await tester.tap(find.text(label));
-        await pumpFrames(tester, frames: 3);
-      }
-      final TestGesture drag = await tester.startGesture(
-        tester.getCenter(find.byIcon(Icons.drag_handle).first),
-      );
-      await pumpFrames(tester, frames: 2);
-      await drag.moveBy(const Offset(0, 160));
-      await pumpFrames(tester, frames: 3);
-      await drag.up();
-      await pumpFrames(tester);
-      await unmount(tester);
-    });
-
-    testWidgets('S7 dissolves a row, then removes it', (
-      WidgetTester tester,
-    ) async {
-      await mount(tester, scenarioById(buildStockScenarios(), 'S7'));
       // The third song (index 2) is the target.
       expect(find.text('Slow River'), findsOneWidget);
       await tester.tap(find.text('Play once'));
@@ -172,19 +115,12 @@ void defineStockInteractionTests() {
       await unmount(tester);
     });
 
-    testWidgets('S7 swipe removes a song', (WidgetTester tester) async {
-      await mount(tester, scenarioById(buildStockScenarios(), 'S7'));
+    testWidgets('S3 swipe removes a song', (WidgetTester tester) async {
+      await mount(tester, scenarioById(buildStockScenarios(), 'S3'));
       expect(find.text('Slow River'), findsOneWidget);
       await tester.drag(find.text('Slow River'), const Offset(200, 0));
       await pumpFrames(tester, frames: 18);
       expect(find.text('Slow River'), findsNothing);
-      await unmount(tester);
-    });
-
-    testWidgets('S8 opens the keyboard field', (WidgetTester tester) async {
-      await mount(tester, scenarioById(buildStockScenarios(), 'S8'));
-      await tester.tap(find.byType(TextField));
-      await pumpFrames(tester);
       await unmount(tester);
     });
   });

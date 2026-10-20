@@ -67,76 +67,6 @@ class _CoverPainter extends CustomPainter {
   bool shouldRepaint(_CoverPainter old) => old.seed != seed;
 }
 
-/// A round artist avatar with initials.
-class ArtistAvatar extends StatelessWidget {
-  const ArtistAvatar({super.key, required this.name, this.radius = 24});
-
-  final String name;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    final int seed = name.codeUnits.fold<int>(0, (int a, int b) => a + b);
-    final String initials = name
-        .split(' ')
-        .where((String w) => w.isNotEmpty && w[0].toUpperCase() != w[0].toLowerCase())
-        .take(2)
-        .map((String w) => w[0].toUpperCase())
-        .join();
-    return Container(
-      width: radius * 2,
-      height: radius * 2,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[seedColor(seed), seedColor(seed + 4, value: 0.65)],
-        ),
-      ),
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: radius * 0.7,
-        ),
-      ),
-    );
-  }
-}
-
-/// A filled, fully rounded genre chip.
-class GenreChip extends StatelessWidget {
-  const GenreChip({super.key, required this.genre, this.height = 32});
-
-  final String genre;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final int seed = kGenres.indexOf(genre) + 1;
-    return Container(
-      height: height,
-      padding: EdgeInsets.symmetric(horizontal: height * 0.5),
-      alignment: Alignment.center,
-      decoration: ShapeDecoration(
-        color: seedColor(seed * 3, saturation: 0.8, value: 0.85),
-        shape: const StadiumBorder(),
-      ),
-      child: Text(
-        genre,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-      ),
-    );
-  }
-}
-
 /// A song row: cover art, title, artist and album, duration.
 class SongTile extends StatelessWidget {
   const SongTile({
@@ -291,7 +221,7 @@ class AlbumRow extends StatelessWidget {
 /// The default songs list used by the blur scenarios: songs, with a row of
 /// albums every sixth item.
 ///
-/// [overrides] replaces individual rows (the animated ones in S6 and S7).
+/// [overrides] replaces individual rows (the animated ones in S2 and S3).
 class SongsListView extends StatelessWidget {
   const SongsListView({
     super.key,
